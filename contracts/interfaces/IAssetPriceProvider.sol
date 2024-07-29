@@ -17,10 +17,4 @@ interface IAssetPriceProvider {
      */
     function getAssetPrice(address asset) external view returns (uint256);
 
-    /**
-     * @dev returns the asset oracle address
-     * @param asset the address of the asset
-     * @return the address of the asset oracle
-     */
-    function getAssetOracle(address asset) external view returns (IAssetPriceOracle);
 }

@@ -6,6 +6,7 @@ import "../libraries/traits/AddressCheckerTrait.sol";
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../solady/src/tokens/ERC20.sol";
 import "../solady/src/utils/FixedPointMathLib.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 
 /// @notice A vault that holds a single asset as collateral.
 /// @dev It discards stealth donations and tracks its underlying collateral balance manually.
@@ -15,6 +16,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
+    IERC20 internal immutable _uAsset;
+    
     IERC20 internal immutable _collateral;
 
     uint256 internal _totalCollateralAssets;
@@ -25,6 +28,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     string private _symbol;
 
     constructor(
+        address uAsset_,
         address collateral_,
         string memory name_,
         string memory symbol_,
@@ -32,6 +36,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     )
         nonZeroAddressAndContract(collateral_)
     {
+        _uAsset = IERC20(uAsset_);
         _collateral = IERC20(collateral_);
         _collateralAssetDecimals = decimals_;
         _name = name_;
@@ -86,7 +91,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     {
         (updatedAssets, shares) = previewDeposit(assets);
         _totalCollateralAssets += updatedAssets;
-        _collateral.safeTransferFrom(caller, address(this), updatedAssets);
+        IERC20(_uAsset).safeTransferFrom(caller, address(this), updatedAssets);
+        IERC20Rebasing(address(_collateral)).wrap(updatedAssets);
         _mint(receiver, shares);
     }
 
@@ -102,7 +108,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
         (updatedAssets, updatedShares) = previewWithdraw(shares);
         _totalCollateralAssets -= updatedAssets;
         _burn(caller, updatedShares);
-        _collateral.safeTransfer(receiver, updatedAssets);
+        IERC20Rebasing(address(_collateral)).unwrap(updatedAssets);
+        IERC20(_uAsset).safeTransfer(receiver, updatedAssets);
     }
 
     function _withdrawAssets(address caller, address receiver, uint256 assets) internal virtual {
@@ -111,6 +118,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
         _totalCollateralAssets -= assets;
         _burn(caller, shares);
         _collateral.safeTransfer(receiver, assets);
+        IERC20Rebasing(address(_collateral)).unwrap(assets);
+        _uAsset.safeTransfer(receiver, assets);
     }
 
     /// @dev Returns the shares minted for given assets, rounding down.

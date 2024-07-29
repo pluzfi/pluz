@@ -18,6 +18,7 @@ import "../libraries/Errors.sol";
 import "../interfaces/IFlashLoanLender.sol";
 import "../interfaces/ILendingPool.sol";
 import "../interfaces/IFlashLoanRecipient.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 
 // Note: Areas for improvement
 // 1. Compound interest, need to understand how debt amount and utilization contribute to linear interest
@@ -80,9 +81,13 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     /// @notice Minimum open borrow a user can have.
     uint256 internal _minimumOpenBorrow;
 
+    /// @notice The user asset
+    IERC20 private immutable _uAsset;
+
     struct BaseInitParams {
         address interestRateStrategy;
         uint256 minimumOpenBorrow;
+        address uAsset;
     }
 
     constructor(
@@ -116,6 +121,10 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
 
         // The initial deposit cap is set ot the max
         depositCap = type(uint256).max;
+
+        _uAsset = IERC20(params.uAsset);
+        // Approve rebasing token to transfer assets
+        _uAsset.safeIncreaseAllowance(address(reserve.asset), type(uint256).max);
     }
 
     ////////////////////
@@ -190,7 +199,8 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
 
         reserve.assetBalance += amount;
 
-        IERC20(reserve.asset).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(_uAsset).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20Rebasing(address(reserve.asset)).wrap(amount);
         liquidityToken.mint(msg.sender, amount, reserve.liquidityIndex, MathUtils.ROUNDING.DOWN);
 
         _mintToTreasury();
@@ -219,7 +229,8 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
         reserve.assetBalance -= amountToWithdraw;
 
         liquidityToken.burn(msg.sender, amountToWithdraw, reserve.liquidityIndex, isMaxWithdraw, MathUtils.ROUNDING.UP);
-        IERC20(reserve.asset).safeTransfer(msg.sender, amountToWithdraw);
+        IERC20Rebasing(address(reserve.asset)).unwrap(amountToWithdraw);
+        IERC20(_uAsset).safeTransfer(msg.sender, amountToWithdraw);
 
         _mintToTreasury();
         _updateInterestRate();
@@ -378,6 +389,11 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     //////////////////////////
     // Views
     //////////////////////////
+
+    /// @notice Returns the uasset used for wrap/unwrap
+    function getUAsset() public view returns (IERC20) {
+        return _uAsset;
+    }
 
     /// @notice Returns the asset used for deposits/borrows
     function getAsset() public view returns (IERC20) {

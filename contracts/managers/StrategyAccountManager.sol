@@ -39,10 +39,9 @@ abstract contract StrategyAccountManager is AccountManager, StrategyAccountManag
     /// @notice Constructs the factory
     constructor(
         address protocolGovernor_,
-        address liquidationReceiverImpl_,
-        IAccountManager oldAccountManager_
+        address liquidationReceiverImpl_
     )
-        AccountManager(protocolGovernor_, liquidationReceiverImpl_, oldAccountManager_)
+        AccountManager(protocolGovernor_, liquidationReceiverImpl_)
     { }
 
     /// @notice Get an active strategy's address by index

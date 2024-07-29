@@ -4,24 +4,24 @@ pragma solidity 0.8.24;
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../lendingPool/LendingPool.sol";
 import { mulDiv } from "@prb/math/src/Common.sol";
-import "./JuiceModule.sol";
-import "../external/blast/IERC20Rebasing.sol";
+import "./PluzModule.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 import "../libraries/Errors.sol";
-import "./periphery/BlastGas.sol";
-import "./periphery/BlastPoints.sol";
+import "./periphery/PluzGas.sol";
+import "./periphery/PluzPoints.sol";
 
-/// @title Juice Lending Pool
-/// @notice This contract extends LendingPool to account for Blast native features - USDB yield and gas refunds.
-contract JuiceLendingPool is LendingPool, JuiceModule, BlastGas, BlastPoints {
+/// @title Pluz Lending Pool
+/// @notice This contract extends LendingPool to account for Linea native features - USDC yield.
+contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints {
     using SafeERC20 for IERC20;
 
     uint256 public MINIMUM_COMPOUND_AMOUNT = 1e6;
 
     struct InitParams {
         address interestRateStrategy;
-        address blastPointsOperator;
         uint256 minimumOpenBorrow;
         bool isAutoCompounding;
+        address uAsset;
     }
 
     bool public isAutoCompounding;
@@ -30,14 +30,15 @@ contract JuiceLendingPool is LendingPool, JuiceModule, BlastGas, BlastPoints {
         address protocolGovernor_,
         InitParams memory params
     )
-        BlastGas(protocolGovernor_)
-        BlastPoints(protocolGovernor_, params.blastPointsOperator)
-        JuiceModule(protocolGovernor_)
+        PluzGas(protocolGovernor_)
+        PluzPoints(protocolGovernor_)
+        PluzModule(protocolGovernor_)
         LendingPool(
             protocolGovernor_,
             LendingPool.BaseInitParams({
                 interestRateStrategy: params.interestRateStrategy,
-                minimumOpenBorrow: params.minimumOpenBorrow
+                minimumOpenBorrow: params.minimumOpenBorrow,
+                uAsset: params.uAsset
             })
         )
     {
@@ -58,19 +59,19 @@ contract JuiceLendingPool is LendingPool, JuiceModule, BlastGas, BlastPoints {
         }
 
         uint256 claimableYield = IERC20Rebasing(address(reserve.asset)).getClaimableAmount(address(this));
-        UD60x18 pendingUsdbYield = ud(reserve.assetBalance + claimableYield).div(ud(reserve.assetBalance));
+        UD60x18 pendingUsdcYield = ud(reserve.assetBalance + claimableYield).div(ud(reserve.assetBalance));
 
         return MathUtils.calculateCompoundedInterest(reserve.liquidityRate, timestamp).mul(reserve.liquidityIndex).mul(
-            pendingUsdbYield
+            pendingUsdcYield
         );
     }
 
-    /// @notice Accrue USDB yield earned from idle reserve assets and distribute it to depositors.
+    /// @notice Accrue USDC yield earned from idle reserve assets and distribute it to depositors.
     function compound() external nonReentrant returns (uint256 earned) {
         earned = _compound();
     }
 
-    /// @notice Pull USDB yield from some address and distribute it to depositors.
+    /// @notice Pull USDC yield from some address and distribute it to depositors.
     function sendYield(uint256 amount) external onlyLendYieldSender {
         uint256 reserveBalanceBefore = reserve.assetBalance;
         IERC20(reserve.asset).safeTransferFrom(msg.sender, address(this), amount);
@@ -78,13 +79,13 @@ contract JuiceLendingPool is LendingPool, JuiceModule, BlastGas, BlastPoints {
     }
 
     function _compound() internal returns (uint256 earned) {
-        IERC20Rebasing usdb = IERC20Rebasing(address(reserve.asset));
-        earned = usdb.getClaimableAmount(address(this));
+        IERC20Rebasing rusdc = IERC20Rebasing(address(reserve.asset));
+        earned = rusdc.getClaimableAmount(address(this));
 
         // Avoid compounding dust.
         if (earned >= MINIMUM_COMPOUND_AMOUNT) {
             uint256 reserveBalanceBefore = reserve.assetBalance;
-            earned = usdb.claim(address(this), earned);
+            earned = rusdc.claim(address(this), earned);
             _accrueYield(reserveBalanceBefore, earned);
         }
     }

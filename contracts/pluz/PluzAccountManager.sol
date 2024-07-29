@@ -5,14 +5,15 @@ import "../managers/StrategyAccountManager.sol";
 import "../interfaces/IAssetPriceProvider.sol";
 import "../libraries/accounts/AccountLib.sol";
 import "../libraries/Errors.sol";
-import "./JuiceModule.sol";
-import "./JuiceAccount.sol";
+import "./PluzModule.sol";
+import "./PluzAccount.sol";
 import "./ERC20CollateralVault.sol";
-import "./periphery/BlastGas.sol";
-import "./periphery/BlastPoints.sol";
+import "./periphery/PluzGas.sol";
+import "./periphery/PluzPoints.sol";
 import "../periphery/PythPusher.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 
-abstract contract JuiceAccountManagerEvents {
+abstract contract PluzAccountManagerEvents {
     /// @notice A user has created an account.
     event AccountCreated(address indexed owner, address account);
     /// @notice A user has deposited WETH into the contract.
@@ -27,16 +28,16 @@ abstract contract JuiceAccountManagerEvents {
     );
 }
 
-/// @title JuiceAccountManager supports one account implementation
+/// @title PluzAccountManager supports one account implementation
 /// @notice The AccountManager contract deploys Account contracts.
-contract JuiceAccountManager is
+contract PluzAccountManager is
     StrategyAccountManager,
     PythPusher,
-    JuiceModule,
-    JuiceAccountManagerEvents,
+    PluzModule,
+    PluzAccountManagerEvents,
     ERC20CollateralVault,
-    BlastGas,
-    BlastPoints
+    PluzGas,
+    PluzPoints
 {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
@@ -56,18 +57,18 @@ contract JuiceAccountManager is
 
     /// @notice The implementation address of the Internal/External
     /// Account contracts to use for cloning
-    address public immutable juiceAccountImplementation;
+    address public immutable pluzAccountImplementation;
 
     mapping(address => address) private _ownerAccountCache;
 
     bool public isAutoCompounding;
 
     struct InitParams {
-        address juiceAccount;
-        address blastPointsOperator;
+        address pluzAccount;
         bool isAutoCompounding;
         address liquidationReceiver;
-        address weth;
+        address uAsset;
+        address rebasingCollateral;
         UD60x18 maxLtv;
         UD60x18 collateralRatio;
         string name;
@@ -76,26 +77,26 @@ contract JuiceAccountManager is
     }
 
     /// @notice Constructs the factory
-    /// @param params The parameters for the JuiceAccountManager
     constructor(
         address protocolGovernor_,
-        InitParams memory params,
-        IAccountManager _oldAccountManager
+        InitParams memory params
     )
-        JuiceModule(protocolGovernor_)
-        BlastPoints(protocolGovernor_, params.blastPointsOperator)
-        BlastGas(protocolGovernor_)
-        StrategyAccountManager(protocolGovernor_, params.liquidationReceiver, _oldAccountManager)
-        ERC20CollateralVault(params.weth, params.name, params.symbol, params.decimals)
-        nonZeroAddressAndContract(params.juiceAccount)
+        PluzModule(protocolGovernor_)
+        PluzPoints(protocolGovernor_)
+        PluzGas(protocolGovernor_)
+        StrategyAccountManager(protocolGovernor_, params.liquidationReceiver)
+        ERC20CollateralVault(params.uAsset, params.rebasingCollateral, params.name, params.symbol, params.decimals)
+        nonZeroAddressAndContract(params.pluzAccount)
     {
-        juiceAccountImplementation = params.juiceAccount;
+        pluzAccountImplementation = params.pluzAccount;
         maxLtv = params.maxLtv;
         collateralRatio = params.collateralRatio;
         _initializePyth(protocolGovernor_);
-        IERC20Rebasing(address(params.weth)).configure(YieldMode.CLAIMABLE);
+        IERC20Rebasing(address(params.rebasingCollateral)).configure(YieldMode.CLAIMABLE);
         isAutoCompounding = params.isAutoCompounding;
-        oldAccountManager = _oldAccountManager;
+
+        // Approve rebasing token to transfer assets
+        _uAsset.safeIncreaseAllowance(address(_collateral), type(uint256).max);
     }
 
     function toggleAutoCompounding() public onlyOwner {
@@ -124,7 +125,7 @@ contract JuiceAccountManager is
             revert Errors.InvalidParams();
         }
 
-        account = payable(Clones.cloneDeterministic(juiceAccountImplementation, _salt(owner)));
+        account = payable(Clones.cloneDeterministic(pluzAccountImplementation, _salt(owner)));
 
         // Record the account was created
         isCreatedAccount[account] = true;
@@ -135,7 +136,8 @@ contract JuiceAccountManager is
         emit AccountCreated(owner, account);
 
         // Initialize the account
-        JuiceAccount(account).initialize(owner);
+        PluzAccount(account).initialize(owner);
+        IERC20Rebasing(address(_lendAsset)).setAuthorizedAccount(account);
     }
 
     function createNewAccountDepositCollateralAndBorrow(
@@ -354,7 +356,7 @@ contract JuiceAccountManager is
     function getAccount(address owner_) public view returns (address account) {
         account = _ownerAccountCache[owner_];
         if (account == address(0)) {
-            account = Clones.predictDeterministicAddress(juiceAccountImplementation, _salt(owner_));
+            account = Clones.predictDeterministicAddress(pluzAccountImplementation, _salt(owner_));
         }
     }
 

@@ -6,7 +6,7 @@ import "../interfaces/IProtocolGovernor.sol";
 
 /// @notice List of permissions that can be granted to addresses.
 library Roles {
-    /// @notice Can call the `sendYield` function on the JuiceLendingPool to redirect yield back to senders.
+    /// @notice Can call the `sendYield` function on the PluzLendingPool to redirect yield back to senders.
     bytes32 public constant LEND_YIELD_SENDER = keccak256(abi.encode("LEND_YIELD_SENDER"));
 
     /// @notice Gas tank depositor

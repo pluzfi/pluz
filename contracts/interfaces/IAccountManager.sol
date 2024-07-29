@@ -9,8 +9,6 @@ import "./ILiquidationReceiver.sol";
 
 interface IAccountManager {
     function lendingPool() external view returns (address);
-    function isCreatedAccount(address) external view returns (bool);
-    function accountCount() external view returns (uint256);
     function isApprovedStrategy(address strategy) external view returns (bool);
     function isLiquidationReceiver(address receiver) external view returns (bool);
 
@@ -69,6 +67,7 @@ interface IAccountManager {
     )
         external;
 
+    function getLendingPoolUAsset() external view returns (IERC20);
     function getLendAsset() external view returns (IERC20);
     function getDebtAmount(address account) external view returns (uint256);
     function getTotalCollateralValue(address account) external view returns (uint256 totalValue);

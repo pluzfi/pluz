@@ -20,6 +20,7 @@ interface ILendingPool {
     function getTotalSupply() external view returns (uint256);
     function getTotalBorrow() external view returns (uint256);
 
+    function getUAsset() external view returns (IERC20);
     function getAsset() external view returns (IERC20);
     function getNormalizedIncome() external view returns (UD60x18);
     function getNormalizedDebt() external view returns (UD60x18);

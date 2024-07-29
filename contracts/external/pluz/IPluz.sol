@@ -12,14 +12,14 @@ enum GasMode {
     CLAIMABLE
 }
 
-interface IBlastPoints {
+interface IPluzPoints {
     function configurePointsOperator(address operator) external;
     function configurePointsOperatorOnBehalf(address operator, address contractAddress) external;
     function operators(address contractAddress) external view returns (address);
     function readStatus(address contractAddress) external view returns (address, bool, uint256);
 }
 
-interface IBlast {
+interface IPluz {
     // configure
     function configureContract(address contractAddress, YieldMode _yield, GasMode gasMode, address governor) external;
     function configure(YieldMode _yield, GasMode gasMode, address governor) external;

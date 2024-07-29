@@ -5,9 +5,9 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Errors } from "../../libraries/Errors.sol";
 import "../../strategyVault/uniswap/OmegaUniswapV2Strategy.sol";
-import "../JuiceModule.sol";
-import "../periphery/BlastGas.sol";
-import "../periphery/BlastPoints.sol";
+import "../PluzModule.sol";
+import "../periphery/PluzGas.sol";
+import "../periphery/PluzPoints.sol";
 
 interface IHyperlockPointsDeposit {
     // Stake ERC20 token, `_lock` is the amount of time to lock for in seconds
@@ -16,7 +16,7 @@ interface IHyperlockPointsDeposit {
     function unstake(address _lpToken, uint256 _amount) external;
 }
 
-contract JuiceHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, JuiceModule, BlastPoints, BlastGas {
+contract PluzHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, PluzModule, PluzPoints, PluzGas {
     using SafeERC20 for IERC20;
 
     IHyperlockPointsDeposit public constant HYPERLOCK_POINTS =
@@ -24,13 +24,12 @@ contract JuiceHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, Jui
 
     constructor(
         address protocolGovernor_,
-        address pointsOperator_,
         VaultParams memory vaultParams_,
         InitParams memory params
     )   
-        JuiceModule(protocolGovernor_)
-        BlastGas(protocolGovernor_)
-        BlastPoints(protocolGovernor_, pointsOperator_)
+        PluzModule(protocolGovernor_)
+        PluzGas(protocolGovernor_)
+        PluzPoints(protocolGovernor_)
         OmegaUniswapV2Strategy(protocolGovernor_, vaultParams_, params)
     { }
 

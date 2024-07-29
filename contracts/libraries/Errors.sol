@@ -137,7 +137,7 @@ library Errors {
     error NoPosition();
 }
 
-library BlastErrors {
+library PluzErrors {
     /// @dev For contracts that need to compound claimable yield onto themselves, they cannot claim with themselves as
     /// the recipient.
     /// To get around this, they claim to another contract that reflects the yield back to them.

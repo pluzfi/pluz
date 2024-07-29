@@ -30,18 +30,6 @@ library GovernorLib {
     /// @notice Asset used to facilitate lending and borrowing.
     bytes32 public constant LEND_ASSET = keccak256(abi.encode("LEND_ASSET"));
 
-    /// @notice Blast native contract implementing IBlast interface for configuring gas refunds and native ETH rebasing.
-    bytes32 public constant BLAST = keccak256(abi.encode("BLAST"));
-
-    /// @notice Blast native contract used on contract initialization to assign an operator that configures points
-    /// received by that smart contract.
-    bytes32 public constant BLAST_POINTS = keccak256(abi.encode("BLAST_POINTS"));
-
-    bytes32 public constant BLAST_POINTS_JUICE_ACCOUNTS_OPERATOR =
-        keccak256(abi.encode("BLAST_POINTS_JUICE_ACCOUNTS_OPERATOR"));
-
-    /// @dev Currently unused. Was meant to allow Accounts to redirect yield from idle borrow back to Lending Pool.
-    bytes32 public constant BLAST_LENDER_YIELD_SINK = keccak256(abi.encode("BLAST_LENDER_YIELD_SINK"));
 
     ///////////////
     // FEES
@@ -53,13 +41,13 @@ library GovernorLib {
 
     /// @notice % taken from any funds used to repay debt during liquidating state.
     /*
-    If an Account with 100 USDB Strategy position gets liquidated with protocolShare of 4%, liquidatorShare of 1%.
-        If no slippage, 100 USDB is received by Repayment contract.
+    If an Account with 100 USDC Strategy position gets liquidated with protocolShare of 4%, liquidatorShare of 1%.
+        If no slippage, 100 USDC is received by Repayment contract.
         
         Repayment contract is executed with:
-            - 4 USDB going to protocol
-            - 1 USDB going to liquidator
-            - 95 USDB going to repay Account debt
+            - 4 USDC going to protocol
+            - 1 USDC going to liquidator
+            - 95 USDC going to repay Account debt
     */
     bytes32 public constant PROTOCOL_LIQUIDATION_SHARE = keccak256(abi.encode("PROTOCOL_LIQUIDATION_SHARE"));
 

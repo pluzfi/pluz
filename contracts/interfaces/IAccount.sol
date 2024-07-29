@@ -11,10 +11,6 @@ interface IAccount {
     /// @notice How much debt was paid back to the lending pool
     event Repay(uint256 amount);
 
-    function asset() external view returns (IERC20);
-
-    function owner() external view returns (address);
-
     /// @dev Returns a unique identifier distinguishing this type of account
     function getKind() external view returns (bytes32);
 

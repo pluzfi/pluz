@@ -88,7 +88,6 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
     ///////////////////////////
     address immutable liquidationReceiverImpl;
 
-    IAccountManager immutable oldAccountManager;
 
     modifier onlyAccount() {
         if (!isCreatedAccount[msg.sender]) {
@@ -114,8 +113,7 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
     /// @notice Constructs the factory
     constructor(
         address protocolGovernor_,
-        address liquidationReceiverImpl_,
-        IAccountManager oldAccountManager_
+        address liquidationReceiverImpl_
     )
         ProtocolModule(protocolGovernor_)
         nonZeroAddressAndContract(address(_getPriceProvider()))
@@ -124,7 +122,6 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
         liquidationReceiverImpl = liquidationReceiverImpl_;
         _lendingPool = ILendingPool(_getLendingPool());
         _lendAsset = IERC20(_getLendAsset());
-        oldAccountManager = oldAccountManager_;
         allowedAccountsMode = true;
     }
 
@@ -189,38 +186,6 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
         repaid = _lendingPool.repay(amount, account, msg.sender);
 
         emit AccountRepaid(_accountOwnerCache[account], account, repaid);
-
-        this._afterRepay(account, repaid);
-    }
-
-    /// @dev Anyone can use an accounts existing funds + their own funds for interest and make the debt of old account
-    /// go to zero
-    function repayToCloseAccount(address account) external virtual nonReentrant returns (uint256 repaid) {
-        if (!oldAccountManager.isCreatedAccount(account)) {
-            revert OldAccountDoesNotExist(); //unauthorised
-        }
-
-        uint256 accountBalance = _lendAsset.balanceOf(account);
-        //repay as much as possible from the account itself
-        uint256 repaidAmountFromAccount;
-
-        if (accountBalance > 0) {
-            repaidAmountFromAccount = _lendingPool.repay(accountBalance, account, account);
-        }
-
-        uint256 remaningDebt = getDebtAmount(account);
-
-        //take the remaining debt from the msg.sender (the tank or the user themselves)
-        if (remaningDebt > 0) {
-            _lendingPool.repay(remaningDebt + 3, account, msg.sender);
-        }
-
-        //has to make debt go to zero to
-        if (getDebtAmount(account) > 0) {
-            revert RemainingDebtLeft();
-        }
-
-        emit AccountRepaid(address(0), account, repaidAmountFromAccount + remaningDebt);
 
         this._afterRepay(account, repaid);
     }
@@ -348,6 +313,10 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
 
     function getFeeCollector() external view returns (address) {
         return _getFeeCollector();
+    }
+
+    function getLendingPoolUAsset() external view returns (IERC20) {
+        return _lendingPool.getUAsset();
     }
 
     function getLendAsset() external view returns (IERC20) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import "./IBlast.sol";
+import "./IPluz.sol";
 
 interface IERC20Rebasing {
     // changes the yield mode of the caller and update the balance
@@ -16,4 +16,9 @@ interface IERC20Rebasing {
     function transfer(address recipient, uint256 amount) external returns (bool);
     function approve(address spender, uint256 amount) external returns (bool);
     function getConfiguration(address contractAddress) external view returns (uint8);
+     // Set authorized account
+    function setAuthorizedAccount(address account) external;
+    // wrap and unwrap functions
+    function wrap(uint256 amount) external;
+    function unwrap(uint256 amount) external;
 }

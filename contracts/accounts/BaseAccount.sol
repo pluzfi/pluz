@@ -16,6 +16,7 @@ import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import "../interfaces/ILendingPool.sol";
 import "../libraries/Errors.sol";
 import "../periphery/Multicall.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 
 abstract contract BaseAccountEvents {
     /////////////////////////////
@@ -97,6 +98,8 @@ abstract contract BaseAccount is
         asset.safeIncreaseAllowance(_manager.lendingPool(), type(uint256).max);
         // Approve manager to transfer assets
         asset.safeIncreaseAllowance(address(_manager), type(uint256).max);
+        // Approve rebasing token to transfer assets
+        _manager.getLendingPoolUAsset().safeIncreaseAllowance(address(asset), type(uint256).max);
     }
 
     ////////////////////////////
@@ -196,7 +199,9 @@ abstract contract BaseAccount is
     /// @notice Repay the lending pool
     /// @param amountFrom Additional amount to pull from owner before repayment
     function repayFrom(uint256 amountFrom) external payable virtual onlyOwner {
-        asset.safeTransferFrom(_msgSender(), address(this), amountFrom);
+        IERC20 _uAsset = _manager.getLendingPoolUAsset();
+        _uAsset.safeTransferFrom(_msgSender(), address(this), amountFrom);
+        IERC20Rebasing(address(asset)).wrap(amountFrom);
         uint256 amountRepaid = _manager.repay(address(this), asset.balanceOf(address(this)));
         emit Repay(amountRepaid);
     }
