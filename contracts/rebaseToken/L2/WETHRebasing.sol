@@ -147,4 +147,16 @@ contract WETHRebasing is ERC20Rebasing, Semver, Ownable {
     function _EIP712Version() internal override view returns (string memory) {
         return version();
     }
+
+    /// @notice Gets the actual asset address for this Rebasing token
+    /// @return Address of the actual asset
+    function getActualAsset() external view returns (address) {
+        return address(WETH);
+    }
+
+    /// @notice Gets the decimals of the actual asset
+    /// @return Decimals of the actual asset
+    function getActualAssetDecimals() external view returns (uint8) {
+        return 18;
+    }
 }

@@ -9,18 +9,18 @@ import "../PluzModule.sol";
 import "../periphery/PluzGas.sol";
 import "../periphery/PluzPoints.sol";
 
-interface IHyperlockPointsDeposit {
-    // Stake ERC20 token, `_lock` is the amount of time to lock for in seconds
-    function stake(address _lpToken, uint256 _amount, uint256 _lock) external;
-    // unstake ERC20 token
-    function unstake(address _lpToken, uint256 _amount) external;
+interface ILynexGaugeV2Deposit {
+    // deposit amount stakeToken
+    function deposit(uint256 amount) external;
+    // withdraw a certain amount of stakeToken
+    function withdraw(uint256 amount) external;
 }
 
-contract PluzHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, PluzModule, PluzPoints, PluzGas {
+contract PluzLynexGaugeV2LpDepositStrategy is OmegaUniswapV2Strategy, PluzModule, PluzPoints, PluzGas {
     using SafeERC20 for IERC20;
 
-    IHyperlockPointsDeposit public constant HYPERLOCK_POINTS =
-        IHyperlockPointsDeposit(0xC3EcaDB7a5faB07c72af6BcFbD588b7818c4a40e);
+    ILynexGaugeV2Deposit public constant LYNEX_GAUGE_V2 =
+        ILynexGaugeV2Deposit(0xa9946Cd8b9B902FB50239a6fBE0f62f6cb0F0E0D);
 
     constructor(
         address protocolGovernor_,
@@ -43,8 +43,8 @@ contract PluzHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, Pluz
         returns (uint256 receivedShares)
     {
         receivedShares = super._deposit(assets, data, recipient);
-        pair.approve(address(HYPERLOCK_POINTS), receivedShares);
-        HYPERLOCK_POINTS.stake(address(pair), receivedShares, 0);
+        pair.approve(address(LYNEX_GAUGE_V2), receivedShares);
+        LYNEX_GAUGE_V2.deposit(receivedShares);
     }
 
     function _withdraw(
@@ -57,7 +57,7 @@ contract PluzHyperlockERC20PointsDepositStrategy is OmegaUniswapV2Strategy, Pluz
         override
         returns (uint256 receivedAssets)
     {
-        HYPERLOCK_POINTS.unstake(address(pair), shares);
+        LYNEX_GAUGE_V2.withdraw(shares);
         receivedAssets = _removeLiquidity(caller, shares, data, recipient);
     }
 }

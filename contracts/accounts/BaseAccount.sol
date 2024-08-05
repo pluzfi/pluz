@@ -59,6 +59,9 @@ abstract contract BaseAccount is
     /// @notice The asset used by this investment account
     IERC20 public asset;
 
+    /// @notice The actual asset
+    IERC20 public actualAsset;
+
     /////////////////////////////
     // State Variables
     /////////////////////////////
@@ -92,14 +95,17 @@ abstract contract BaseAccount is
     function _initialize(address owner_) internal {
         _manager = IAccountManager(msg.sender);
         asset = _manager.getLendAsset();
+        actualAsset = IERC20(IERC20Rebasing(address(asset)).getActualAsset());
         owner = owner_;
 
         // Approve repayments to the lending pool
         asset.safeIncreaseAllowance(_manager.lendingPool(), type(uint256).max);
+        // Approve repayments to the lending pool
+        actualAsset.safeIncreaseAllowance(_manager.lendingPool(), type(uint256).max);
         // Approve manager to transfer assets
         asset.safeIncreaseAllowance(address(_manager), type(uint256).max);
         // Approve rebasing token to transfer assets
-        _manager.getLendingPoolUAsset().safeIncreaseAllowance(address(asset), type(uint256).max);
+        actualAsset.safeIncreaseAllowance(address(asset), type(uint256).max);
     }
 
     ////////////////////////////
@@ -199,10 +205,8 @@ abstract contract BaseAccount is
     /// @notice Repay the lending pool
     /// @param amountFrom Additional amount to pull from owner before repayment
     function repayFrom(uint256 amountFrom) external payable virtual onlyOwner {
-        IERC20 _uAsset = _manager.getLendingPoolUAsset();
-        _uAsset.safeTransferFrom(_msgSender(), address(this), amountFrom);
-        IERC20Rebasing(address(asset)).wrap(amountFrom);
-        uint256 amountRepaid = _manager.repay(address(this), asset.balanceOf(address(this)));
+        actualAsset.safeTransferFrom(_msgSender(), address(this), amountFrom);
+        uint256 amountRepaid = _manager.repay(address(this), actualAsset.balanceOf(address(this)));
         emit Repay(amountRepaid);
     }
 

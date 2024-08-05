@@ -49,7 +49,7 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
     /// @custom:semver 1.0.0
     /// @param _USDC        Address of USDC.
     constructor(address _USDC)
-        ERC20Rebasing(6)
+        ERC20Rebasing(18)
         Semver(1, 0, 0)
     {
         USDC = IERC20(_USDC);
@@ -77,7 +77,9 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
     /// @param _amount  Amount of USDC to wrap
     /// msg.sender      Address to send rUSDC
     function wrap(uint256 _amount) external onlyAuthorized {
-        USDC.transferFrom(msg.sender, address(this), _amount);
+        uint256 convertAmount = _amount / 10**12;
+
+        USDC.transferFrom(msg.sender, address(this), convertAmount);
         _mint(msg.sender, _amount);
     }
 
@@ -85,8 +87,10 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
     /// @param _amount  Amount of rUSDC to unwrap
     /// msg.sender      Address to send USDC
     function unwrap(uint256 _amount) external onlyAuthorized {
+        uint256 convertAmount = _amount / 10**12;
+
         _burn(msg.sender, _amount);
-        USDC.transfer(msg.sender, _amount);
+        USDC.transfer(msg.sender, convertAmount);
     }
 
     function _mint(address _to, uint256 _amount) internal {
@@ -112,5 +116,17 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
      */
     function _EIP712Version() internal override view returns (string memory) {
         return version();
+    }
+
+    /// @notice Gets the actual asset address for this Rebasing token
+    /// @return Address of the actual asset
+    function getActualAsset() external view returns (address) {
+        return address(USDC);
+    }
+
+    /// @notice Gets the decimals of the actual asset
+    /// @return Decimals of the actual asset
+    function getActualAssetDecimals() external view returns (uint8) {
+        return 6;
     }
 }

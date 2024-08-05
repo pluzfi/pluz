@@ -21,7 +21,6 @@ contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints {
         address interestRateStrategy;
         uint256 minimumOpenBorrow;
         bool isAutoCompounding;
-        address uAsset;
     }
 
     bool public isAutoCompounding;
@@ -37,8 +36,7 @@ contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints {
             protocolGovernor_,
             LendingPool.BaseInitParams({
                 interestRateStrategy: params.interestRateStrategy,
-                minimumOpenBorrow: params.minimumOpenBorrow,
-                uAsset: params.uAsset
+                minimumOpenBorrow: params.minimumOpenBorrow
             })
         )
     {

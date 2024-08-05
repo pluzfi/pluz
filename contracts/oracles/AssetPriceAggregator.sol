@@ -17,6 +17,9 @@ contract AssetPriceAggregator is ProtocolModule, IAssetPriceProvider, AssetPrice
     /// @dev Most price feeds need to be normalized to base asset, but some are already denominated in base asset.
     mapping(address => bool) internal _isNormalized;
 
+    // Mapping of rebase token assets to their actual asset types
+    mapping(address => address) public assetMapping;
+
     struct Providers {
         IAssetPriceProvider primary;
         IAssetPriceProvider backup;
@@ -95,7 +98,16 @@ contract AssetPriceAggregator is ProtocolModule, IAssetPriceProvider, AssetPrice
         }
     }
 
-    function getAssetPrice(address asset) external view override returns (uint256 priceInBase) {
+    function setAssetMapping(address rebaseAsset, address mappedAsset) external onlyOwner {
+        assetMapping[rebaseAsset] = mappedAsset;
+    }
+
+    function getAssetPrice(address rebaseAsset) external view override returns (uint256 priceInBase) {
+        address asset = assetMapping[rebaseAsset];
+        if (asset == address(0)) {
+            asset = rebaseAsset;
+        }
+
         if (asset == _props.base) {
             return 10 ** _props.decimals;
         }

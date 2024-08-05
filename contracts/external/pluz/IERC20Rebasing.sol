@@ -21,4 +21,6 @@ interface IERC20Rebasing {
     // wrap and unwrap functions
     function wrap(uint256 amount) external;
     function unwrap(uint256 amount) external;
+    function getActualAsset() external view returns (address);
+    function getActualAssetDecimals() external view returns (uint8);
 }

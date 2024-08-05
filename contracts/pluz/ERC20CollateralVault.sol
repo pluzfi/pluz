@@ -16,7 +16,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
-    IERC20 internal immutable _uAsset;
+    IERC20 internal immutable _actualAsset;
     
     IERC20 internal immutable _collateral;
 
@@ -28,7 +28,6 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     string private _symbol;
 
     constructor(
-        address uAsset_,
         address collateral_,
         string memory name_,
         string memory symbol_,
@@ -36,8 +35,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     )
         nonZeroAddressAndContract(collateral_)
     {
-        _uAsset = IERC20(uAsset_);
         _collateral = IERC20(collateral_);
+        _actualAsset = IERC20(IERC20Rebasing(collateral_).getActualAsset());
         _collateralAssetDecimals = decimals_;
         _name = name_;
         _symbol = symbol_;
@@ -91,7 +90,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
     {
         (updatedAssets, shares) = previewDeposit(assets);
         _totalCollateralAssets += updatedAssets;
-        IERC20(_uAsset).safeTransferFrom(caller, address(this), updatedAssets);
+        _actualAsset.safeTransferFrom(caller, address(this), updatedAssets);
         IERC20Rebasing(address(_collateral)).wrap(updatedAssets);
         _mint(receiver, shares);
     }
@@ -109,7 +108,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
         _totalCollateralAssets -= updatedAssets;
         _burn(caller, updatedShares);
         IERC20Rebasing(address(_collateral)).unwrap(updatedAssets);
-        IERC20(_uAsset).safeTransfer(receiver, updatedAssets);
+        _actualAsset.safeTransfer(receiver, updatedAssets);
     }
 
     function _withdrawAssets(address caller, address receiver, uint256 assets) internal virtual {
@@ -117,9 +116,8 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
         uint256 shares = assets.mulDivUp(totalSupply(), totalAssets());
         _totalCollateralAssets -= assets;
         _burn(caller, shares);
-        _collateral.safeTransfer(receiver, assets);
         IERC20Rebasing(address(_collateral)).unwrap(assets);
-        _uAsset.safeTransfer(receiver, assets);
+        _actualAsset.safeTransfer(receiver, assets);
     }
 
     /// @dev Returns the shares minted for given assets, rounding down.

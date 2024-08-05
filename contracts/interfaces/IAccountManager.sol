@@ -67,7 +67,6 @@ interface IAccountManager {
     )
         external;
 
-    function getLendingPoolUAsset() external view returns (IERC20);
     function getLendAsset() external view returns (IERC20);
     function getDebtAmount(address account) external view returns (uint256);
     function getTotalCollateralValue(address account) external view returns (uint256 totalValue);

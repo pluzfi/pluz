@@ -24,6 +24,7 @@ import "../interfaces/IAssetPriceProvider.sol";
 import "../interfaces/ILiquidationReceiver.sol";
 import "../libraries/accounts/AccountLib.sol";
 import "../libraries/Errors.sol";
+import "../external/pluz/IERC20Rebasing.sol";
 
 /// @title Account Factory Events
 /// @dev Place all events used by the AccountManager contract here
@@ -66,6 +67,8 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
     ILendingPool internal immutable _lendingPool;
 
     IERC20 internal immutable _lendAsset;
+    
+    IERC20 internal immutable _lendPoolActualAsset;
 
     /// @notice An mapping of all Account contracts that have been created
     mapping(address => bool) public isCreatedAccount;
@@ -122,6 +125,7 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
         liquidationReceiverImpl = liquidationReceiverImpl_;
         _lendingPool = ILendingPool(_getLendingPool());
         _lendAsset = IERC20(_getLendAsset());
+        _lendPoolActualAsset = IERC20(_lendingPool.getActualAsset());
         allowedAccountsMode = true;
     }
 
@@ -195,6 +199,7 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
     /// @param recipient The address to send the assets to
     function claim(uint256 amount, address recipient) external nonZeroAddress(recipient) onlyAccount nonReentrant {
         uint256 debtAmount = getDebtAmount(msg.sender);
+        uint256 convertAmount = _convertAmount(amount, IERC20Rebasing(address(_lendAsset)));
 
         if (debtAmount > 0) {
             uint256 investmentValue = getTotalAccountValue(msg.sender);
@@ -203,10 +208,12 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
             if (amount > profit) {
                 revert Errors.NotClaimableProfit();
             }
-            _lendAsset.safeTransferFrom(msg.sender, recipient, amount);
+            IERC20Rebasing(address(_lendAsset)).unwrap(amount);
+            _lendPoolActualAsset.safeTransferFrom(msg.sender, recipient, convertAmount);
             _requireSolvent(msg.sender);
         } else {
-            _lendAsset.safeTransferFrom(msg.sender, recipient, amount);
+            IERC20Rebasing(address(_lendAsset)).unwrap(amount);
+            _lendPoolActualAsset.safeTransferFrom(msg.sender, recipient, convertAmount);
         }
 
         emit AccountClaimed(_accountOwnerCache[msg.sender], msg.sender, amount);
@@ -268,9 +275,9 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
         }
 
         // Account has idle borrowed funds, transfer them to the liquidator receiver.
-        if (_lendAsset.balanceOf(address(account)) > 0) {
-            _lendAsset.safeTransferFrom(
-                address(account), address(liquidationReceiver_), _lendAsset.balanceOf(address(account))
+        if (_lendPoolActualAsset.balanceOf(address(account)) > 0) {
+            _lendPoolActualAsset.safeTransferFrom(
+                address(account), address(liquidationReceiver_), _lendPoolActualAsset.balanceOf(address(account))
             );
         }
 
@@ -313,10 +320,6 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
 
     function getFeeCollector() external view returns (address) {
         return _getFeeCollector();
-    }
-
-    function getLendingPoolUAsset() external view returns (IERC20) {
-        return _lendingPool.getUAsset();
     }
 
     function getLendAsset() external view returns (IERC20) {
@@ -417,5 +420,19 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
     /// @param addr The address to convert
     function _salt(address addr) internal view virtual returns (bytes32) {
         return keccak256(abi.encodePacked(addr, address(this)));
+    }
+
+    function _convertAmount(uint256 amount, IERC20Rebasing asset) internal view returns (uint256) {
+        uint256 actualDecimals = asset.getActualAssetDecimals();
+        uint256 convertedAmount = amount;
+
+        if (actualDecimals == 6) {
+            convertedAmount = amount / 10**12;
+        } else if (actualDecimals != 18) {
+            // Ensure only 6 or 18 decimals are handled
+            revert Errors.InvalidDecimals();
+        }
+
+        return convertedAmount;
     }
 }

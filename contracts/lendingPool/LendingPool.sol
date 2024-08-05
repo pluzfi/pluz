@@ -82,12 +82,11 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     uint256 internal _minimumOpenBorrow;
 
     /// @notice The user asset
-    IERC20 private immutable _uAsset;
+    IERC20 private immutable _actualAsset;
 
     struct BaseInitParams {
         address interestRateStrategy;
         uint256 minimumOpenBorrow;
-        address uAsset;
     }
 
     constructor(
@@ -122,9 +121,9 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
         // The initial deposit cap is set ot the max
         depositCap = type(uint256).max;
 
-        _uAsset = IERC20(params.uAsset);
+        _actualAsset = IERC20(IERC20Rebasing(address(reserve.asset)).getActualAsset());
         // Approve rebasing token to transfer assets
-        _uAsset.safeIncreaseAllowance(address(reserve.asset), type(uint256).max);
+        _actualAsset.safeIncreaseAllowance(address(reserve.asset), type(uint256).max);
     }
 
     ////////////////////
@@ -181,6 +180,20 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
         _updateInterestRate();
     }
 
+    function _convertAmount(uint256 amount, IERC20Rebasing asset) internal view returns (uint256) {
+        uint256 actualDecimals = asset.getActualAssetDecimals();
+        uint256 convertedAmount = amount;
+
+        if (actualDecimals == 6) {
+            convertedAmount = amount / 10**12;
+        } else if (actualDecimals != 18) {
+            // Ensure only 6 or 18 decimals are handled
+            revert Errors.InvalidDecimals();
+        }
+
+        return convertedAmount;
+    }
+
     /// @notice         Deposit underlying assets into the pool
     /// @param amount   The amount of underlying assets to deposit
     function deposit(uint256 amount)
@@ -198,8 +211,10 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
         _beforeAction();
 
         reserve.assetBalance += amount;
+        
+        uint256 convertAmount = _convertAmount(amount, IERC20Rebasing(address(reserve.asset)));
 
-        IERC20(_uAsset).safeTransferFrom(msg.sender, address(this), amount);
+        _actualAsset.safeTransferFrom(msg.sender, address(this), convertAmount);
         IERC20Rebasing(address(reserve.asset)).wrap(amount);
         liquidityToken.mint(msg.sender, amount, reserve.liquidityIndex, MathUtils.ROUNDING.DOWN);
 
@@ -214,6 +229,8 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     /// @param amount The amount of underlying assets to withdraw
     function withdraw(uint256 amount) public virtual whenNotPaused nonReentrant returns (uint256) {
         uint256 amountToWithdraw = amount;
+        
+        uint256 convertAmount = _convertAmount(amountToWithdraw, IERC20Rebasing(address(reserve.asset)));
 
         _beforeAction();
 
@@ -230,7 +247,7 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
 
         liquidityToken.burn(msg.sender, amountToWithdraw, reserve.liquidityIndex, isMaxWithdraw, MathUtils.ROUNDING.UP);
         IERC20Rebasing(address(reserve.asset)).unwrap(amountToWithdraw);
-        IERC20(_uAsset).safeTransfer(msg.sender, amountToWithdraw);
+        _actualAsset.safeTransfer(msg.sender, convertAmount);
 
         _mintToTreasury();
         _updateInterestRate();
@@ -311,12 +328,15 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
             revert Errors.InsufficientLiquidity();
         }
 
+        uint256 convertAmount = _convertAmount(amount, IERC20Rebasing(address(reserve.asset)));
+
         _beforeAction();
 
         reserve.assetBalance -= amount;
 
         debtToken.mint(onBehalfOf, amount, reserve.borrowIndex, MathUtils.ROUNDING.UP);
-        reserve.asset.safeTransfer(onBehalfOf, amount);
+        IERC20Rebasing(address(reserve.asset)).unwrap(amount);
+        _actualAsset.safeTransfer(onBehalfOf, convertAmount);
 
         _mintToTreasury();
         _updateInterestRate();
@@ -390,9 +410,9 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     // Views
     //////////////////////////
 
-    /// @notice Returns the uasset used for wrap/unwrap
-    function getUAsset() public view returns (IERC20) {
-        return _uAsset;
+    /// @notice Returns the actual asset used for wrap/unwrap
+    function getActualAsset() public view returns (IERC20) {
+        return _actualAsset;
     }
 
     /// @notice Returns the asset used for deposits/borrows
@@ -465,11 +485,14 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
             isMaxRepay = true;
         }
 
+        uint256 convertAmount = _convertAmount(paybackAmount, IERC20Rebasing(address(reserve.asset)));
+
         reserve.assetBalance += paybackAmount;
 
         debtToken.burn(borrower, paybackAmount, reserve.borrowIndex, isMaxRepay, MathUtils.ROUNDING.DOWN);
 
-        reserve.asset.safeTransferFrom(from, address(this), paybackAmount);
+        _actualAsset.safeTransferFrom(from, address(this), convertAmount);
+        IERC20Rebasing(address(reserve.asset)).wrap(paybackAmount);
 
         _mintToTreasury();
         _updateInterestRate();

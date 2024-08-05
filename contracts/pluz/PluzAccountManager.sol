@@ -67,8 +67,7 @@ contract PluzAccountManager is
         address pluzAccount;
         bool isAutoCompounding;
         address liquidationReceiver;
-        address uAsset;
-        address rebasingCollateral;
+        address collateral;
         UD60x18 maxLtv;
         UD60x18 collateralRatio;
         string name;
@@ -85,18 +84,18 @@ contract PluzAccountManager is
         PluzPoints(protocolGovernor_)
         PluzGas(protocolGovernor_)
         StrategyAccountManager(protocolGovernor_, params.liquidationReceiver)
-        ERC20CollateralVault(params.uAsset, params.rebasingCollateral, params.name, params.symbol, params.decimals)
+        ERC20CollateralVault(params.collateral, params.name, params.symbol, params.decimals)
         nonZeroAddressAndContract(params.pluzAccount)
     {
         pluzAccountImplementation = params.pluzAccount;
         maxLtv = params.maxLtv;
         collateralRatio = params.collateralRatio;
         _initializePyth(protocolGovernor_);
-        IERC20Rebasing(address(params.rebasingCollateral)).configure(YieldMode.CLAIMABLE);
+        IERC20Rebasing(address(params.collateral)).configure(YieldMode.CLAIMABLE);
         isAutoCompounding = params.isAutoCompounding;
 
-        // Approve rebasing token to transfer assets
-        _uAsset.safeIncreaseAllowance(address(_collateral), type(uint256).max);
+        // Approve rebasing token to transfer actual assets
+        _actualAsset.safeIncreaseAllowance(address(_collateral), type(uint256).max);
     }
 
     function toggleAutoCompounding() public onlyOwner {
@@ -267,7 +266,9 @@ contract PluzAccountManager is
         _withdrawAssets(accountOwner, liquidationFeeTo, _result.bonusCollateral);
 
         // Transfer debt from sender to account.
-        _lendAsset.safeTransferFrom(msg.sender, account, _result.actualDebtToLiquidate);
+        uint256 convertAmount = _convertAmount(_result.actualDebtToLiquidate, IERC20Rebasing(address(_lendAsset)));
+        IERC20Rebasing(address(_lendAsset)).unwrap(_result.actualDebtToLiquidate);
+        _lendPoolActualAsset.safeTransferFrom(msg.sender, account, convertAmount);
         IAccount(account).repay(_result.actualDebtToLiquidate);
 
         emit CollateralLiquidation(
