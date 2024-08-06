@@ -208,11 +208,9 @@ abstract contract AccountManager is IAccountManager, Pausable, AccountManagerEve
             if (amount > profit) {
                 revert Errors.NotClaimableProfit();
             }
-            IERC20Rebasing(address(_lendAsset)).unwrap(amount);
             _lendPoolActualAsset.safeTransferFrom(msg.sender, recipient, convertAmount);
             _requireSolvent(msg.sender);
         } else {
-            IERC20Rebasing(address(_lendAsset)).unwrap(amount);
             _lendPoolActualAsset.safeTransferFrom(msg.sender, recipient, convertAmount);
         }
 

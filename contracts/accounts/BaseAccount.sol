@@ -104,6 +104,8 @@ abstract contract BaseAccount is
         actualAsset.safeIncreaseAllowance(_manager.lendingPool(), type(uint256).max);
         // Approve manager to transfer assets
         asset.safeIncreaseAllowance(address(_manager), type(uint256).max);
+        // Approve manager to transfer assets
+        actualAsset.safeIncreaseAllowance(address(_manager), type(uint256).max);
         // Approve rebasing token to transfer assets
         actualAsset.safeIncreaseAllowance(address(asset), type(uint256).max);
     }
@@ -205,8 +207,21 @@ abstract contract BaseAccount is
     /// @notice Repay the lending pool
     /// @param amountFrom Additional amount to pull from owner before repayment
     function repayFrom(uint256 amountFrom) external payable virtual onlyOwner {
-        actualAsset.safeTransferFrom(_msgSender(), address(this), amountFrom);
-        uint256 amountRepaid = _manager.repay(address(this), actualAsset.balanceOf(address(this)));
+        uint256 actualDecimals = IERC20Rebasing(address(asset)).getActualAssetDecimals();
+        uint256 convertedAmount = amountFrom;
+        if (actualDecimals == 6) {
+            convertedAmount = amountFrom / 10**12;
+        }
+
+        actualAsset.safeTransferFrom(_msgSender(), address(this), convertedAmount);
+
+        uint256 assetBalance = actualAsset.balanceOf(address(this));
+        uint256 convertAssetBalance = assetBalance;
+        if (actualDecimals == 6) {
+            convertAssetBalance = assetBalance * 10**12;
+        }
+
+        uint256 amountRepaid = _manager.repay(address(this), convertAssetBalance);
         emit Repay(amountRepaid);
     }
 

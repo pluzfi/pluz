@@ -187,7 +187,13 @@ abstract contract StrategyAccountManager is AccountManager, StrategyAccountManag
     /// @notice Get the value of all strategies investments
     /// @return totalValue The value of all strategy investments in lendAsset
     function getTotalAccountValue(address account) public view override returns (uint256 totalValue) {
-        totalValue = _lendAsset.balanceOf(address(account));
+        uint256 lendPoolBalance = _lendPoolActualAsset.balanceOf(address(account));
+        uint256 decimals = IERC20Rebasing(address(_lendAsset)).getActualAssetDecimals();
+        if (decimals == 6) {
+            lendPoolBalance = lendPoolBalance * 10**12;
+        }
+        
+        totalValue = lendPoolBalance;
         // Sum the value of all active strategy vaults
         // Note: This needs attention as getPositionValue may revert, it contains external calls
         // slither-disable-next-line calls-loop
