@@ -230,8 +230,6 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
     function withdraw(uint256 amount) public virtual whenNotPaused nonReentrant returns (uint256) {
         uint256 amountToWithdraw = amount;
         
-        uint256 convertAmount = _convertAmount(amountToWithdraw, IERC20Rebasing(address(reserve.asset)));
-
         _beforeAction();
 
         bool isMaxWithdraw = false;
@@ -243,6 +241,8 @@ contract LendingPool is Pausable, ILendingPool, IFlashLoanLender, ProtocolModule
             isMaxWithdraw = true;
         }
 
+        uint256 convertAmount = _convertAmount(amountToWithdraw, IERC20Rebasing(address(reserve.asset)));
+        
         reserve.assetBalance -= amountToWithdraw;
 
         liquidityToken.burn(msg.sender, amountToWithdraw, reserve.liquidityIndex, isMaxWithdraw, MathUtils.ROUNDING.UP);

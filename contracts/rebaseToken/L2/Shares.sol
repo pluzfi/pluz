@@ -2,18 +2,18 @@
 pragma solidity 0.8.15;
 
 import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 import { Semver } from "../src/universal/Semver.sol";
 import { AddressAliasHelper } from "../src/vendor/AddressAliasHelper.sol";
 import { Predeploys } from "../libraries/Predeploys.sol";
 import { Pluz, YieldMode, GasMode } from "./Pluz.sol";
 
-/// @custom:predeploy 0x4300000000000000000000000000000000000000
 /// @title SharesBase
 /// @notice Base contract to track share rebasing and yield reporting.
 abstract contract SharesBase is Initializable {
     /// @notice Approved yield reporter.
-    address public REPORTER;
+    address public immutable REPORTER;
 
     /// @notice Share price. This value can only increase.
     uint256 public price;
@@ -34,8 +34,9 @@ abstract contract SharesBase is Initializable {
     error DistributeFailed(uint256 count, uint256 pending);
     error PriceIsInitialized();
 
-    constructor() {
-        
+    /// @param _reporter Address of the approved yield reporter.
+    constructor(address _reporter) {
+        REPORTER = _reporter;
     }
 
     /// @notice Initializer.
@@ -60,7 +61,7 @@ abstract contract SharesBase is Initializable {
     }
 
     function _addValue(uint256 value) internal virtual {
-        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != REPORTER) {
+        if (msg.sender != REPORTER) {
             revert InvalidReporter();
         }
 
@@ -90,23 +91,28 @@ abstract contract SharesBase is Initializable {
     }
 }
 
-/// @custom:predeploy 0x4300000000000000000000000000000000000000
 /// @title Shares
 /// @notice Integrated EVM contract to manage native ether share
 ///         rebasing from yield reports.
-contract Shares is SharesBase, Semver {
+contract Shares is SharesBase, Semver, Ownable {
     /// @notice Total number of shares. This value is modified directly
     ///         by the sequencer EVM.
     uint256 private _count;
 
+    address public WETHRebasingAddress;
+
     /// @notice _reporter Address of approved yield reporter.
-    constructor() SharesBase() Semver(1, 0, 0) {
+    constructor(address _reporter) SharesBase(_reporter) Semver(1, 0, 0) {
         
     }
 
     /// @notice Initializer.
     function initialize(uint256 _price) public initializer {
         __SharesBase_init({ _price: _price });
+    }
+
+    function setWETHRebasingAddress(address _WETHRebasingAddress) external onlyOwner {
+        WETHRebasingAddress = _WETHRebasingAddress;
     }
 
     /// @inheritdoc SharesBase
@@ -117,7 +123,7 @@ contract Shares is SharesBase, Semver {
     function _addValue(uint256 value) internal override {
         super._addValue(value);
 
-        SharesBase(Predeploys.WETH_REBASING).addValue(value);
+        SharesBase(WETHRebasingAddress).addValue(value);
     }
 
 }

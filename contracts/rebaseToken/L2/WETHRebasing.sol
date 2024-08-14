@@ -17,6 +17,8 @@ contract WETHRebasing is ERC20Rebasing, Semver, Ownable {
 
     IERC20 public immutable WETH;
 
+    address public accountManager;
+
     mapping(address => bool) public isAuthorized;
 
     /// @notice Emitted whenever tokens are deposited to an account.
@@ -37,17 +39,19 @@ contract WETHRebasing is ERC20Rebasing, Semver, Ownable {
         _;
     }
 
-    modifier onlyAuthorizedRole() {
-        require(msg.sender == owner(), "Caller is not owner or account manager");
+    modifier onlyAccountManager() {
+        require(msg.sender == accountManager, "Caller is not account manager");
         _;
     }
 
     /// @custom:semver 1.0.0
     constructor(address _WETH)
-        ERC20Rebasing(18)
+        ERC20Rebasing(Predeploys.SHARES, 18)
         Semver(1, 0, 0)
     {
         WETH = IERC20(_WETH);
+        isAuthorized[Predeploys.SHARES] = true;
+        WETH.approve(Predeploys.SHARES, type(uint256).max);
     }
 
     /// @notice Initializer.
@@ -59,11 +63,17 @@ contract WETHRebasing is ERC20Rebasing, Semver, Ownable {
         );
     }
 
+    /// @notice Sets the account manager
+    function setAccountManager(address _accountManager) external onlyOwner {
+        require(_accountManager != address(0), "Invalid account manager address");
+        accountManager = _accountManager;
+    }
+
     /// @notice Sets an authorized account and approves the maximum WETH token allowance for it.
-    function setAuthorizedAccount(address _account) external onlyAuthorizedRole {
-        require(_account != address(0), "_account address not set");
-        isAuthorized[_account] = true;
-        WETH.approve(_account, type(uint256).max);
+    function setAuthorizedAccount() external onlyAccountManager {
+        require(msg.sender != address(0), "_account address not set");
+        isAuthorized[msg.sender] = true;
+        WETH.approve(msg.sender, type(uint256).max);
     }
 
     /// @notice             wrap WETH

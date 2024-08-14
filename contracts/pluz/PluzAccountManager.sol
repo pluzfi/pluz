@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "../managers/StrategyAccountManager.sol";
 import "../interfaces/IAssetPriceProvider.sol";
 import "../libraries/accounts/AccountLib.sol";
@@ -36,6 +37,7 @@ contract PluzAccountManager is
     PluzModule,
     PluzAccountManagerEvents,
     ERC20CollateralVault,
+    Initializable,
     PluzGas,
     PluzPoints
 {
@@ -98,6 +100,10 @@ contract PluzAccountManager is
         _actualAsset.safeIncreaseAllowance(address(_collateral), type(uint256).max);
     }
 
+    function initialize() external virtual initializer {
+        IERC20Rebasing(address(_collateral)).setAuthorizedAccount();
+    }
+
     function toggleAutoCompounding() public onlyOwner {
         isAutoCompounding = !isAutoCompounding;
     }
@@ -136,7 +142,6 @@ contract PluzAccountManager is
 
         // Initialize the account
         PluzAccount(account).initialize(owner);
-        IERC20Rebasing(address(_lendAsset)).setAuthorizedAccount(account);
     }
 
     function createNewAccountDepositCollateralAndBorrow(
@@ -242,7 +247,7 @@ contract PluzAccountManager is
 
     /// @dev This calculation assumes that debt asset and collateral asset have the same decimals and have 18 decimal
     /// precision.
-    function liquidateCollateral(address account, uint256 debtToCover, address liquidationFeeTo) public {
+    function liquidateCollateral(address account, uint256 debtToCover, address liquidationFeeTo) public nonReentrant {
         AccountLib.Health memory health = getAccountHealth(account);
 
         if (!health.isLiquidatable) revert Errors.AccountHealthy();
@@ -267,7 +272,6 @@ contract PluzAccountManager is
 
         // Transfer debt from sender to account.
         uint256 convertAmount = _convertAmount(_result.actualDebtToLiquidate, IERC20Rebasing(address(_lendAsset)));
-        IERC20Rebasing(address(_lendAsset)).unwrap(_result.actualDebtToLiquidate);
         _lendPoolActualAsset.safeTransferFrom(msg.sender, account, convertAmount);
         IAccount(account).repay(_result.actualDebtToLiquidate);
 

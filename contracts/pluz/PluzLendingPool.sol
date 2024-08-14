@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "../lendingPool/LendingPool.sol";
 import { mulDiv } from "@prb/math/src/Common.sol";
 import "./PluzModule.sol";
@@ -12,7 +13,7 @@ import "./periphery/PluzPoints.sol";
 
 /// @title Pluz Lending Pool
 /// @notice This contract extends LendingPool to account for Linea native features - USDC yield.
-contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints {
+contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints, Initializable {
     using SafeERC20 for IERC20;
 
     uint256 public MINIMUM_COMPOUND_AMOUNT = 1e6;
@@ -42,6 +43,10 @@ contract PluzLendingPool is LendingPool, PluzModule, PluzGas, PluzPoints {
     {
         isAutoCompounding = params.isAutoCompounding;
         IERC20Rebasing(address(reserve.asset)).configure(YieldMode.CLAIMABLE);
+    }
+
+    function initialize() external virtual initializer {
+        IERC20Rebasing(address(reserve.asset)).setAuthorizedAccount();
     }
 
     function toggleAutoCompounding() public onlyOwner {

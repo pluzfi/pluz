@@ -77,7 +77,7 @@ abstract contract ERC20Rebasing is ERC20PermitUpgradeable, SharesBase, IERC20 {
     error NotClaimableAccount();
 
     /// @param _decimals Number of decimals.
-    constructor(uint8 _decimals) SharesBase() {
+    constructor(address _reporter, uint8 _decimals) SharesBase(_reporter) {
         decimals = _decimals;
     }
 

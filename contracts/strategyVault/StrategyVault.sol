@@ -209,6 +209,10 @@ abstract contract StrategyVault is IStrategyVault, Context, ERC20, ProtocolModul
         // on behalf of Accounts.
 
         uint256 totalShares = balanceOf(msg.sender);
+        if (totalShares <= 0) {
+            // If there are no shares, there is no need to proceed with liquidation
+            return 0;
+        }
 
         // Get the Manager that created the Account to check the Account's liquidation status
         IAccountManager manager = IAccount(msg.sender).getManager();

@@ -17,7 +17,7 @@ interface IERC20Rebasing {
     function approve(address spender, uint256 amount) external returns (bool);
     function getConfiguration(address contractAddress) external view returns (uint8);
      // Set authorized account
-    function setAuthorizedAccount(address account) external;
+    function setAuthorizedAccount() external;
     // wrap and unwrap functions
     function wrap(uint256 amount) external;
     function unwrap(uint256 amount) external;

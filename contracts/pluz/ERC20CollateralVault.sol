@@ -71,7 +71,7 @@ abstract contract ERC20CollateralVault is ERC20, AddressCheckerTrait {
 
     function previewDeposit(uint256 assets) public view virtual returns (uint256 updatedAssets, uint256 shares) {
         shares = _convertToShares(assets);
-        updatedAssets = _convertToAssets(shares);
+        updatedAssets = assets;
     }
 
     function previewWithdraw(uint256 shares) public view virtual returns (uint256 assets, uint256 updatedShares) {

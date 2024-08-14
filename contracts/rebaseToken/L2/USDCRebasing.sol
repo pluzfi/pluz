@@ -18,7 +18,7 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
 
     IERC20 public immutable USDC;
 
-    address public accountManager;
+    address public lendingPool;
 
     mapping(address => bool) public isAuthorized;
 
@@ -41,18 +41,21 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
         _;
     }
 
-    modifier onlyAuthorizedRole() {
-        require(msg.sender == owner() || msg.sender == accountManager, "Caller is not owner or account manager");
+    modifier onlyLendingPool() {
+        require(msg.sender == lendingPool, "Caller is not lending pool");
         _;
     }
 
     /// @custom:semver 1.0.0
+    /// @param _usdYieldManager Address of the USD Yield Manager. SharesBase yield reporter.
     /// @param _USDC        Address of USDC.
-    constructor(address _USDC)
-        ERC20Rebasing(18)
+    constructor(address _usdYieldManager, address _USDC)
+        ERC20Rebasing(_usdYieldManager, 18)
         Semver(1, 0, 0)
     {
         USDC = IERC20(_USDC);
+        isAuthorized[_usdYieldManager] = true;
+        USDC.approve(_usdYieldManager, type(uint256).max);
     }
 
     /// @notice Initializer
@@ -60,17 +63,17 @@ contract USDCRebasing is ERC20Rebasing, Semver, Ownable {
         __ERC20Rebasing_init("rebase USDC", "rUSDC", 1e9);
     }
 
-    /// @notice Sets the account manager
-    function setAccountManager(address _accountManager) external onlyOwner {
-        require(_accountManager != address(0), "Invalid account manager address");
-        accountManager = _accountManager;
+    /// @notice Sets the lending pool
+    function setLendingPool(address _lendingPool) external onlyOwner {
+        require(_lendingPool != address(0), "Invalid lending pool address");
+        lendingPool = _lendingPool;
     }
 
-    /// @notice Sets an authorized account and approves the maximum USDC token allowance for it.
-    function setAuthorizedAccount(address _account) external onlyAuthorizedRole {
-        require(_account != address(0), "_account address not set");
-        isAuthorized[_account] = true;
-        USDC.approve(_account, type(uint256).max);
+    /// @notice Sets an lending pool approves the maximum USDC token allowance for it.
+    function setAuthorizedAccount() external onlyLendingPool {
+        require(msg.sender != address(0), "_account address not set");
+        isAuthorized[msg.sender] = true;
+        USDC.approve(msg.sender, type(uint256).max);
     }
 
     /// @notice         wrap USDC
