@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IStrategyVault } from "../interfaces/IStrategyVault.sol";
 import { UD60x18, ud } from "@prb/math/src/UD60x18.sol";
@@ -52,7 +53,9 @@ contract InternalAccount is BaseAccount, InternalAccountEvents {
         whenNotPaused
         returns (uint256 receivedShares)
     {
-        actualAsset.safeIncreaseAllowance(strategy, amount);
+        uint256 actualAssetDecimal = IERC20Metadata(address(actualAsset)).decimals();
+        uint256 actualAmount = amount / 10**(18 - actualAssetDecimal);
+        actualAsset.safeIncreaseAllowance(strategy, actualAmount);
 
         uint256 executionGasLimit = 0;
         if (strategy != address(0)) {
@@ -164,8 +167,17 @@ contract InternalAccount is BaseAccount, InternalAccountEvents {
 
         if (strategy != address(0)) {
             receivedAssets = IStrategyVault(strategy).liquidate{ value: executionFee }(recipient, minAmount, data);
+            uint256 actualAssetDecimal = IERC20Metadata(address(actualAsset)).decimals();
+            receivedAssets = receivedAssets / 10**(18 - actualAssetDecimal);
             _postStrategyLiquidation(strategy, recipient, receivedAssets, amountBefore);
         }
+    }
+
+    function claimRewards(address strategy)
+        public
+        returns (uint256[] memory rewards)
+    {
+        rewards = IStrategyVault(strategy).claimRewards();
     }
 
     receive() external payable { }

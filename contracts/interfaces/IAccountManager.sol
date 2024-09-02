@@ -59,6 +59,12 @@ interface IAccountManager {
         payable
         returns (ILiquidationReceiver);
 
+    function liquidateCollateral(
+        address account,
+        uint256 debtToCover,
+        address liquidationFeeTo
+    ) external;
+
     function emitLiquidationFeeEvent(
         address feeCollector,
         address liquidationFeeTo,
@@ -77,4 +83,6 @@ interface IAccountManager {
     /// @notice Returns whether or not an account is liquidatable. If true, return the timestamp its liquidation started
     /// at.
     function getAccountLiquidationStatus(address account) external view returns (AccountLib.LiquidationStatus memory);
+    
+    function getOwner(address account) external view returns (address owner);
 }

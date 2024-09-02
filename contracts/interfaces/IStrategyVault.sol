@@ -45,6 +45,9 @@ interface IStrategyVault {
     /// @notice Performs a complete withdrawal for `msg.sender` and sends funds to receiver.
     function liquidate(address receiver, uint256 minAmount, bytes memory data) external payable returns (uint256);
 
+    /// @notice claimRewards
+    function claimRewards() external returns (uint256[] memory);
+
     /// @notice This function allows users to simulate the effects of their withdrawal at the current block.
     /// @dev Use this to calculate the minAmount of lend token to withdraw during withdrawal
     /// @param shareAmount The amount of shares to redeem

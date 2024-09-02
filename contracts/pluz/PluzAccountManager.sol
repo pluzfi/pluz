@@ -247,7 +247,7 @@ contract PluzAccountManager is
 
     /// @dev This calculation assumes that debt asset and collateral asset have the same decimals and have 18 decimal
     /// precision.
-    function liquidateCollateral(address account, uint256 debtToCover, address liquidationFeeTo) public nonReentrant {
+    function liquidateCollateral(address account, uint256 debtToCover, address liquidationFeeTo) public {
         AccountLib.Health memory health = getAccountHealth(account);
 
         if (!health.isLiquidatable) revert Errors.AccountHealthy();
@@ -363,6 +363,11 @@ contract PluzAccountManager is
         if (account == address(0)) {
             account = Clones.predictDeterministicAddress(pluzAccountImplementation, _salt(owner_));
         }
+    }
+
+    function getOwner(address account) external view returns (address owner) {
+        owner = _accountOwnerCache[account];
+        require(owner != address(0), "Owner is zero address");
     }
 
     function getAccountHealth(address account) public view override returns (AccountLib.Health memory health) {

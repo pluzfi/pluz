@@ -14,6 +14,8 @@ interface ILynexGaugeV2CLDeposit {
     function deposit(uint256 amount) external;
     // withdraw a certain amount of stakeToken
     function withdraw(uint256 amount) external;
+
+    function getReward() external;
 }
 
 contract PluzLynexGaugeV2CLLpDepositStrategy is GammaNarrowUniswapV3Strategy, PluzModule, PluzPoints, PluzGas {
@@ -43,8 +45,11 @@ contract PluzLynexGaugeV2CLLpDepositStrategy is GammaNarrowUniswapV3Strategy, Pl
         returns (uint256 receivedShares)
     {
         receivedShares = super._deposit(assets, data, recipient);
-        pair.approve(address(LYNEX_GAUGE_V2), receivedShares);
+        gamma.approve(address(LYNEX_GAUGE_V2), receivedShares);
         LYNEX_GAUGE_V2.deposit(receivedShares);
+        stakingToken.mint(address(this), receivedShares);
+        IERC20(address(stakingToken)).approve(address(rewardTracker), receivedShares);
+        rewardTracker.stakeForAccount(address(this), recipient, address(stakingToken), receivedShares);
     }
 
     function _withdraw(
@@ -57,7 +62,41 @@ contract PluzLynexGaugeV2CLLpDepositStrategy is GammaNarrowUniswapV3Strategy, Pl
         override
         returns (uint256 receivedAssets)
     {
+        _claimAndDistributeRewards();
+
+        rewardTracker.unstakeForAccount(caller, address(stakingToken), shares, address(this));
+        stakingToken.burn(address(this), shares);
         LYNEX_GAUGE_V2.withdraw(shares);
         receivedAssets = _removeLiquidity(caller, shares, data, recipient);
+    }
+
+    function _claimAndDistributeRewards() private {
+        LYNEX_GAUGE_V2.getReward();
+
+        uint256 totalRewards = rewardToken.balanceOf(address(this));
+        if (totalRewards > 0) {
+            uint256 treasuryShare = (totalRewards * treasuryRate) / 10000;
+            rewardToken.safeTransfer(treasury, treasuryShare);
+
+            uint256 remainingRewards = totalRewards - treasuryShare;
+            rewardToken.safeTransfer(address(rewardDistributor), remainingRewards);
+        }
+    }
+
+    function _claimRewards(address caller, address owner) internal override returns (uint256[] memory rewards) {
+        _claimAndDistributeRewards();
+
+        uint256[] memory claimableRewards = rewardTracker.claimable(caller);
+        bool hasClaimable = false;
+
+        for (uint256 i = 0; i < claimableRewards.length; i++) {
+            if (claimableRewards[i] > 0) {
+                hasClaimable = true;
+                break;
+            }
+        }
+        require(hasClaimable, "No rewards available for claim");
+
+        rewards = rewardTracker.claimForAccount(caller, owner);
     }
 }

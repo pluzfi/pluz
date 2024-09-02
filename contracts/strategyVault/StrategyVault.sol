@@ -10,6 +10,7 @@ import "../system/ProtocolModule.sol";
 import "../libraries/Errors.sol";
 import "../solady/src/tokens/ERC20.sol";
 import "../solady/src/utils/FixedPointMathLib.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 abstract contract StrategyVaultEvents {
@@ -166,12 +167,15 @@ abstract contract StrategyVault is IStrategyVault, Context, ERC20, ProtocolModul
                 && _baseDepositAmounts[recipient] > _vaultParams.maxDepositPerAccount
         ) revert Errors.MaxDepositPerAccountExceeded();
 
-        _baseAsset.safeTransferFrom(recipient, address(this), assets);
+        uint256 baseAssetDecimal = IERC20Metadata(address(_baseAsset)).decimals();
+        uint256 convertAsset = assets / 10**(18 - baseAssetDecimal);
+        _baseAsset.safeTransferFrom(recipient, address(this), convertAsset);
 
         uint256 depositFee = 0;
         if (_vaultParams.depositFee > ZERO) {
             depositFee = (ud(assets) * _vaultParams.depositFee).unwrap();
-            _baseAsset.safeTransfer(_getFeeCollector(), depositFee);
+            uint256 convertDepositFee = depositFee / 10**(18 - baseAssetDecimal);
+            _baseAsset.safeTransfer(_getFeeCollector(), convertDepositFee);
             emit DepositFeeTaken(depositFee);
         }
 
@@ -277,6 +281,14 @@ abstract contract StrategyVault is IStrategyVault, Context, ERC20, ProtocolModul
         internal
         virtual
         returns (uint256);
+
+    function claimRewards() external returns (uint256[] memory rewards) {
+        IAccountManager manager = IAccount(msg.sender).getManager();
+        address owner = manager.getOwner(msg.sender);
+        rewards = _claimRewards(msg.sender, owner);
+    }
+
+    function _claimRewards(address caller, address owner) internal virtual returns (uint256[] memory rewards);
 
     /// @notice This function allows users to simulate the effects of their withdrawal at the current block.
     /// @dev Use this to calculate the minAmount of lend token to withdraw during withdrawal
